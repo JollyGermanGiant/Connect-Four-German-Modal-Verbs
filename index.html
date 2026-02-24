@@ -113,16 +113,42 @@ h1 {
 
 <body>
 
-<h1>Connect Four – German Modal Verbs</h1>
-<div id="status">Player 1's turn</div>
-<div id="board"></div>
-
-<div id="questionModal">
-  <div class="modalContent">
-    <h2 id="questionText"></h2>
-    <div id="options"></div>
+<div class="app">
+<header>
+  <div>
+    <div class="title">Connect Four – German Modal Verbs</div>
+    <div class="sub">Verb/Pronoun pair — Conjugate correctly to claim a spot</div>
   </div>
+  <div class="toolbar panel">
+    <button id="newGame" class="btn-ghost" title="Reset the board">↻ New Game</button>
+  </div>
+</header>
+
+<div class="grid-wrap">
+<section class="board panel">
+  <div class="col-select" id="colSelect"></div>
+  <div id="board" class="board-inner"></div>
+  <div class="legend">Pick a column. Answer correctly to drop your disc.</div>
+</section>
+
+<aside class="side">
+  <div class="panel">
+    <div class="score">
+      <div class="badge"><span class="dot red"></span> Red: <span id="scoreRed">0</span></div>
+      <div class="badge"><span class="dot yellow"></span> Yellow: <span id="scoreYellow">0</span></div>
+    </div>
+    <div id="turn" class="turn">Red to move</div>
+    <div class="question">
+      <div class="qtext" id="qtext">Pick a column to get a question…</div>
+      <div id="answers" class="answers"></div>
+    </div>
+  </div>
+  <div class="panel footer">Built for quick, teacher-directed play. Works offline. ✨</div>
+</aside>
 </div>
+</div>
+
+<div class="toast" id="toast" aria-live="polite"></div>
 
 <script>
 // ===============================
