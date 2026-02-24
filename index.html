@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Connect Four – German Modal Verbs</title>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  text-align: center;
+  background: #f4f6f9;
+  margin: 0;
+}
+
+h1 {
+  margin-top: 20px;
+}
+
+#board {
+  display: grid;
+  grid-template-columns: repeat(7, 70px);
+  gap: 6px;
+  justify-content: center;
+  margin: 20px auto;
+}
+
+.cell {
+  width: 70px;
+  height: 70px;
+  background: white;
+  border-radius: 50%;
+  border: 2px solid #333;
+  cursor: pointer;
+}
+
+.player1 { background: #e74c3c; }
+.player2 { background: #f1c40f; }
+
+#questionModal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.modalContent {
+  background: white;
+  padding: 25px;
+  border-radius: 10px;
+  width: 90%;
+  max-width: 400px;
+}
+
+.optionBtn {
+  display: block;
+  width: 100%;
+  margin: 8px 0;
+  padding: 10px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+#status {
+  font-size: 18px;
+  margin-top: 10px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>Connect Four – German Modal Verbs</h1>
+<div id="status">Player 1's turn</div>
+<div id="board"></div>
+
+<div id="questionModal">
+  <div class="modalContent">
+    <h2 id="questionText"></h2>
+    <div id="options"></div>
+  </div>
+</div>
+
+<script>
+// ===============================
+// Utility Shuffle
+// ===============================
+function shuffle(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
+
+// ===============================
+// Modal Conjugations
+// ===============================
+const modalConjugations = [
+  {verb:"dürfen", forms:[["ich","darf"],["du","darfst"],["er/sie/es","darf"],["wir","dürfen"],["ihr","dürft"],["sie/Sie","dürfen"]]},
+  {verb:"können", forms:[["ich","kann"],["du","kannst"],["er/sie/es","kann"],["wir","können"],["ihr","könnt"],["sie/Sie","können"]]},
+  {verb:"mögen", forms:[["ich","mag"],["du","magst"],["er/sie/es","mag"],["wir","mögen"],["ihr","mögt"],["sie/Sie","mögen"]]},
+  {verb:"müssen", forms:[["ich","muss"],["du","musst"],["er/sie/es","muss"],["wir","müssen"],["ihr","müsst"],["sie/Sie","müssen"]]},
+  {verb:"sollen", forms:[["ich","soll"],["du","sollst"],["er/sie/es","soll"],["wir","sollen"],["ihr","sollt"],["sie/Sie","sollen"]]},
+  {verb:"wollen", forms:[["ich","will"],["du","willst"],["er/sie/es","will"],["wir","wollen"],["ihr","wollt"],["sie/Sie","wollen"]]}
+];
+
+// Build full pool
+const ALL_FORMS = [];
+modalConjugations.forEach(v => {
+  v.forms.forEach(([pronoun, form]) => {
+    ALL_FORMS.push({verb: v.verb, pronoun, form});
+  });
+});
+
+// Build Question Bank
+const QUESTION_BANK = [];
+ALL_FORMS.forEach(entry => {
+  const wrongPool = ALL_FORMS
+    .map(f => f.form)
+    .filter(f => f !== entry.form);
+
+  shuffle(wrongPool);
+
+  const optionsSet = new Set([entry.form]);
+  for (let i = 0; i < wrongPool.length && optionsSet.size < 4; i++) {
+    optionsSet.add(wrongPool[i]);
+  }
+
+  QUESTION_BANK.push({
+    prompt: `${entry.pronoun} — ${entry.verb}`,
+    options: shuffle(Array.from(optionsSet)),
+    correct: entry.form
+  });
+});
+
+let remainingQuestions = [...QUESTION_BANK];
+
+function getNextQuestion() {
+  if (remainingQuestions.length === 0) {
+    remainingQuestions = [...QUESTION_BANK];
+  }
+  shuffle(remainingQuestions);
+  return remainingQuestions.pop();
+}
+
+// ===============================
+// Connect Four Logic
+// ===============================
+const rows = 6;
+const cols = 7;
+let board = [];
+let currentPlayer = 1;
+let selectedColumn = null;
+
+const boardDiv = document.getElementById("board");
+const statusDiv = document.getElementById("status");
+const modal = document.getElementById("questionModal");
+const questionText = document.getElementById("questionText");
+const optionsDiv = document.getElementById("options");
+
+function createBoard() {
+  boardDiv.innerHTML = "";
+  board = [];
+  for (let r = 0; r < rows; r++) {
+    board[r] = [];
+    for (let c = 0; c < cols; c++) {
+      board[r][c] = 0;
+      const cell = document.createElement("div");
+      cell.classList.add("cell");
+      cell.dataset.row = r;
+      cell.dataset.col = c;
+      cell.addEventListener("click", () => handleColumnClick(c));
+      boardDiv.appendChild(cell);
+    }
+  }
+}
+
+function handleColumnClick(col) {
+  selectedColumn = col;
+  askQuestion();
+}
+
+function askQuestion() {
+  const q = getNextQuestion();
+  questionText.textContent = q.prompt;
+  optionsDiv.innerHTML = "";
+
+  q.options.forEach(option => {
+    const btn = document.createElement("button");
+    btn.classList.add("optionBtn");
+    btn.textContent = option;
+    btn.onclick = () => checkAnswer(option, q.correct);
+    optionsDiv.appendChild(btn);
+  });
+
+  modal.style.display = "flex";
+}
+
+function checkAnswer(selected, correct) {
+  modal.style.display = "none";
+  if (selected === correct) {
+    dropPiece(selectedColumn);
+  } else {
+    alert("Incorrect! Turn passes.");
+    switchPlayer();
+  }
+}
+
+function dropPiece(col) {
+  for (let r = rows - 1; r >= 0; r--) {
+    if (board[r][col] === 0) {
+      board[r][col] = currentPlayer;
+      updateBoard();
+      if (checkWin(r, col)) {
+        setTimeout(() => {
+          alert(`Player ${currentPlayer} wins!`);
+          resetGame();
+        }, 100);
+        return;
+      }
+      switchPlayer();
+      return;
+    }
+  }
+}
+
+function updateBoard() {
+  const cells = document.querySelectorAll(".cell");
+  cells.forEach(cell => {
+    const r = cell.dataset.row;
+    const c = cell.dataset.col;
+    cell.classList.remove("player1","player2");
+    if (board[r][c] === 1) cell.classList.add("player1");
+    if (board[r][c] === 2) cell.classList.add("player2");
+  });
+}
+
+function switchPlayer() {
+  currentPlayer = currentPlayer === 1 ? 2 : 1;
+  statusDiv.textContent = `Player ${currentPlayer}'s turn`;
+}
+
+function checkWin(r, c) {
+  const directions = [
+    [[0,1],[0,-1]],
+    [[1,0],[-1,0]],
+    [[1,1],[-1,-1]],
+    [[1,-1],[-1,1]]
+  ];
+
+  for (let dir of directions) {
+    let count = 1;
+    for (let [dr,dc] of dir) {
+      let rr = r + dr;
+      let cc = c + dc;
+      while (
+        rr >= 0 && rr < rows &&
+        cc >= 0 && cc < cols &&
+        board[rr][cc] === currentPlayer
+      ) {
+        count++;
+        rr += dr;
+        cc += dc;
+      }
+    }
+    if (count >= 4) return true;
+  }
+  return false;
+}
+
+function resetGame() {
+  currentPlayer = 1;
+  statusDiv.textContent = "Player 1's turn";
+  createBoard();
+}
+
+createBoard();
+</script>
+
+</body>
+</html>
