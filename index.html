@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Connect Four – German Modal Verbs</title>
 <link rel="manifest" href="manifest.json">
-  <link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f172a">
 <style>
-  :root{
+:root{
   --bg:#0f172a;
   --panel:#111827ee;
   --muted:#94a3b8;
@@ -15,7 +15,9 @@
   --accent:#22d3ee;
   --red:#ef4444;
   --yellow:#f59e0b;
+  --green:#22c55e;
 }
+*{box-sizing:border-box}
 body{margin:0;background:linear-gradient(180deg,#0b1224,#0f172a 40%);color:var(--text);font:16px/1.4 system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
 .app{max-width:1100px;margin:24px auto;padding:16px}
 header{display:flex;gap:16px;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap}
@@ -62,71 +64,14 @@ button:disabled{opacity:.6;cursor:not-allowed}
   .col-btn{font-size:12px;padding:6px}
   .qtext{font-size:16px}
 }
-
-h1 {
-  margin-top: 20px;
-}
-
-#board {
-  display: grid;
-  grid-template-columns: repeat(7, 70px);
-  gap: 6px;
-  justify-content: center;
-  margin: 20px auto;
-}
-
-.cell {
-  width: 70px;
-  height: 70px;
-  background: white;
-  border-radius: 50%;
-  border: 2px solid #333;
-  cursor: pointer;
-}
-
-.player1 { background: #e74c3c; }
-.player2 { background: #f1c40f; }
-
-#questionModal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.7);
-  display: none;
-  align-items: center;
-  justify-content: center;
-}
-
-.modalContent {
-  background: white;
-  padding: 25px;
-  border-radius: 10px;
-  width: 90%;
-  max-width: 400px;
-}
-
-.optionBtn {
-  display: block;
-  width: 100%;
-  margin: 8px 0;
-  padding: 10px;
-  font-size: 16px;
-  cursor: pointer;
-}
-
-#status {
-  font-size: 18px;
-  margin-top: 10px;
-}
 </style>
 </head>
-
 <body>
-
 <div class="app">
 <header>
   <div>
     <div class="title">Connect Four – German Modal Verbs</div>
-    <div class="sub">Verb/Pronoun pair — Conjugate correctly to claim a spot</div>
+    <div class="sub">Answer correctly to claim your spot!</div>
   </div>
   <div class="toolbar panel">
     <button id="newGame" class="btn-ghost" title="Reset the board">↻ New Game</button>
@@ -161,9 +106,8 @@ h1 {
 
 <script>
 // ===============================
-// German Modal Verb Engine
+// German Modal Verb Bank
 // ===============================
-
 const modalConjugations = [
   {verb:"dürfen", forms:[["ich","darf"],["du","darfst"],["er/sie/es","darf"],["wir","dürfen"],["ihr","dürft"],["sie/Sie","dürfen"]]},
   {verb:"können", forms:[["ich","kann"],["du","kannst"],["er/sie/es","kann"],["wir","können"],["ihr","könnt"],["sie/Sie","können"]]},
@@ -173,46 +117,27 @@ const modalConjugations = [
   {verb:"wollen", forms:[["ich","will"],["du","willst"],["er/sie/es","will"],["wir","wollen"],["ihr","wollt"],["sie/Sie","wollen"]]}
 ];
 
+// Flatten into question bank with mixed wrong answers
+const ALL_FORMS = [];
+modalConjugations.forEach(v=>v.forms.forEach(([pronoun,form])=>ALL_FORMS.push({verb:v.verb,pronoun,form})));
+const QUESTION_BANK = ALL_FORMS.map(entry=>{
+  const wrongPool = ALL_FORMS.map(f=>f.form).filter(f=>f!==entry.form);
+  const options = new Set([entry.form]);
+  while(options.size<4) options.add(wrongPool[Math.floor(Math.random()*wrongPool.length)]);
+  return {prompt:`${entry.pronoun} — ${entry.verb}`, options: shuffle([...options]), correct: entry.form};
+});
+
+// ===============================
 // Utility
+// ===============================
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 const shuffle = arr => arr.map(v=>[Math.random(),v]).sort((a,b)=>a[0]-b[0]).map(x=>x[1]);
 function toast(msg, ms=1400){const t=$('#toast');const div=document.createElement('div');div.textContent=msg;t.appendChild(div);setTimeout(()=>div.remove(),ms);}
 
 // ===============================
-// Build Mixed Question Bank
-// ===============================
-
-const ALL_FORMS = [];
-
-modalConjugations.forEach(v=>{
-  v.forms.forEach(([pronoun,form])=>{
-    ALL_FORMS.push({verb:v.verb, pronoun, form});
-  });
-});
-
-const QUESTION_BANK = ALL_FORMS.map(entry=>{
-  const wrongPool = ALL_FORMS
-    .map(f=>f.form)
-    .filter(f=>f!==entry.form);
-
-  const options = new Set([entry.form]);
-
-  while(options.size < 4){
-    options.add(wrongPool[Math.floor(Math.random()*wrongPool.length)]);
-  }
-
-  return {
-    prompt:`${entry.pronoun} — ${entry.verb}`,
-    options: shuffle([...options]),
-    correct: entry.form
-  };
-});
-
-// ===============================
 // Game Variables
 // ===============================
-
 const COLS=7, ROWS=6;
 let grid, current=1, pendingColumn=null, questionPool=shuffle([...QUESTION_BANK]);
 
@@ -238,7 +163,6 @@ function renderBoard(){
       slot.appendChild(disc); b.appendChild(slot);
     }
   }
-
   const cs=$('#colSelect'); cs.innerHTML='';
   for(let c=0;c<COLS;c++){
     const btn=document.createElement('button'); btn.className='col-btn';
@@ -269,15 +193,14 @@ function askQuestion(){
   $('#qtext').textContent=`Column ${pendingColumn+1}: ${currentQuestion.prompt}`;
   const answers=$('#answers'); answers.innerHTML='';
   const opts=shuffle(currentQuestion.options);
-
   for(const opt of opts){
     const btn=document.createElement('button');
     btn.className='answer';
     btn.textContent=opt;
     btn.onclick=()=>{
-      const ok = (opt===currentQuestion.correct);
-      if(!ok){ btn.classList.add('wrong'); }
-      finishQuestion(ok);
+      finishQuestion(opt===currentQuestion.correct);
+      if(opt===currentQuestion.correct) btn.classList.add('correct');
+      else btn.classList.add('wrong');
     };
     answers.appendChild(btn);
   }
@@ -293,9 +216,7 @@ function finishQuestion(correct){
       disableColumns();
       return;
     }
-  } else {
-    toast('❌ Incorrect — turn passes');
-  }
+  } else toast('❌ Incorrect — turn passes');
   pendingColumn=null;
   $('#answers').innerHTML='';
   $('#qtext').textContent='Pick a column to get a question…';
@@ -305,13 +226,13 @@ function finishQuestion(correct){
 }
 
 function dropDisc(col){
-  let row = ROWS-1;
+  let row=ROWS-1;
   while(row>=0 && grid[row][col]!==0) row--;
   if(row<0){ pendingColumn=null; return; }
   grid[row][col]=current;
   renderBoard();
-  const idx = row*COLS + col;
-  const disc = $$('#board .disc')[idx];
+  const idx=row*COLS+col;
+  const disc=$$('#board .disc')[idx];
   requestAnimationFrame(()=>disc.classList.add('show'));
 }
 
@@ -331,14 +252,12 @@ function checkWinner(player){
 function disableColumns(){ $$('#colSelect .col-btn').forEach(btn=>btn.disabled=true); }
 
 $('#newGame').onclick=resetBoard;
-
 resetBoard();
 
 // Service Worker
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./service-worker.js');
-  });
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js'));
 }
 </script>
+</body>
 </html>
