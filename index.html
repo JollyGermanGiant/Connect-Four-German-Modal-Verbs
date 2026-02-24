@@ -86,19 +86,9 @@ h1 {
 
 <script>
 // ===============================
-// Utility Shuffle
+// German Modal Verb Engine
 // ===============================
-function shuffle(array) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-  return array;
-}
 
-// ===============================
-// Modal Conjugations
-// ===============================
 const modalConjugations = [
   {verb:"dürfen", forms:[["ich","darf"],["du","darfst"],["er/sie/es","darf"],["wir","dürfen"],["ihr","dürft"],["sie/Sie","dürfen"]]},
   {verb:"können", forms:[["ich","kann"],["du","kannst"],["er/sie/es","kann"],["wir","können"],["ihr","könnt"],["sie/Sie","können"]]},
@@ -108,186 +98,172 @@ const modalConjugations = [
   {verb:"wollen", forms:[["ich","will"],["du","willst"],["er/sie/es","will"],["wir","wollen"],["ihr","wollt"],["sie/Sie","wollen"]]}
 ];
 
-// Build full pool
+// Utility
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const shuffle = arr => arr.map(v=>[Math.random(),v]).sort((a,b)=>a[0]-b[0]).map(x=>x[1]);
+function toast(msg, ms=1400){const t=$('#toast');const div=document.createElement('div');div.textContent=msg;t.appendChild(div);setTimeout(()=>div.remove(),ms);}
+
+// ===============================
+// Build Mixed Question Bank
+// ===============================
+
 const ALL_FORMS = [];
-modalConjugations.forEach(v => {
-  v.forms.forEach(([pronoun, form]) => {
-    ALL_FORMS.push({verb: v.verb, pronoun, form});
+
+modalConjugations.forEach(v=>{
+  v.forms.forEach(([pronoun,form])=>{
+    ALL_FORMS.push({verb:v.verb, pronoun, form});
   });
 });
 
-// Build Question Bank
-const QUESTION_BANK = [];
-ALL_FORMS.forEach(entry => {
+const QUESTION_BANK = ALL_FORMS.map(entry=>{
   const wrongPool = ALL_FORMS
-    .map(f => f.form)
-    .filter(f => f !== entry.form);
+    .map(f=>f.form)
+    .filter(f=>f!==entry.form);
 
-  shuffle(wrongPool);
+  const options = new Set([entry.form]);
 
-  const optionsSet = new Set([entry.form]);
-  for (let i = 0; i < wrongPool.length && optionsSet.size < 4; i++) {
-    optionsSet.add(wrongPool[i]);
+  while(options.size < 4){
+    options.add(wrongPool[Math.floor(Math.random()*wrongPool.length)]);
   }
 
-  QUESTION_BANK.push({
-    prompt: `${entry.pronoun} — ${entry.verb}`,
-    options: shuffle(Array.from(optionsSet)),
+  return {
+    prompt:`${entry.pronoun} — ${entry.verb}`,
+    options: shuffle([...options]),
     correct: entry.form
-  });
+  };
 });
 
-let remainingQuestions = [...QUESTION_BANK];
+// ===============================
+// Game Variables
+// ===============================
 
-function getNextQuestion() {
-  if (remainingQuestions.length === 0) {
-    remainingQuestions = [...QUESTION_BANK];
-  }
-  shuffle(remainingQuestions);
-  return remainingQuestions.pop();
+const COLS=7, ROWS=6;
+let grid, current=1, pendingColumn=null, questionPool=shuffle([...QUESTION_BANK]);
+
+function resetBoard(){
+  grid=Array.from({length:ROWS},()=>Array(COLS).fill(0));
+  current=1;
+  pendingColumn=null;
+  questionPool=shuffle([...QUESTION_BANK]);
+  renderBoard();
+  updateTurn();
+  $('#qtext').textContent='Pick a column to get a question…';
+  $('#answers').innerHTML='';
 }
 
-// ===============================
-// Connect Four Logic
-// ===============================
-const rows = 6;
-const cols = 7;
-let board = [];
-let currentPlayer = 1;
-let selectedColumn = null;
-
-const boardDiv = document.getElementById("board");
-const statusDiv = document.getElementById("status");
-const modal = document.getElementById("questionModal");
-const questionText = document.getElementById("questionText");
-const optionsDiv = document.getElementById("options");
-
-function createBoard() {
-  boardDiv.innerHTML = "";
-  board = [];
-  for (let r = 0; r < rows; r++) {
-    board[r] = [];
-    for (let c = 0; c < cols; c++) {
-      board[r][c] = 0;
-      const cell = document.createElement("div");
-      cell.classList.add("cell");
-      cell.dataset.row = r;
-      cell.dataset.col = c;
-      cell.addEventListener("click", () => handleColumnClick(c));
-      boardDiv.appendChild(cell);
+function renderBoard(){
+  const b=$('#board'); b.innerHTML='';
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const slot=document.createElement('div'); slot.className='slot';
+      const disc=document.createElement('div'); disc.className='disc';
+      if(grid[r][c]===1) disc.classList.add('red','show');
+      if(grid[r][c]===2) disc.classList.add('yellow','show');
+      slot.appendChild(disc); b.appendChild(slot);
     }
   }
+
+  const cs=$('#colSelect'); cs.innerHTML='';
+  for(let c=0;c<COLS;c++){
+    const btn=document.createElement('button'); btn.className='col-btn';
+    btn.textContent=`Col ${c+1}`;
+    if(grid[0][c]!==0) btn.disabled=true;
+    if(pendingColumn===c) btn.classList.add('active');
+    btn.onclick=()=> chooseColumn(c);
+    cs.appendChild(btn);
+  }
 }
 
-function handleColumnClick(col) {
-  selectedColumn = col;
+function updateTurn(){ $('#turn').textContent=(current===1?'Red':'Yellow')+' to move'; }
+
+function chooseColumn(col){
+  pendingColumn=col;
+  renderBoard();
   askQuestion();
 }
 
-function askQuestion() {
-  const q = getNextQuestion();
-  questionText.textContent = q.prompt;
-  optionsDiv.innerHTML = "";
-
-  q.options.forEach(option => {
-    const btn = document.createElement("button");
-    btn.classList.add("optionBtn");
-    btn.textContent = option;
-    btn.onclick = () => checkAnswer(option, q.correct);
-    optionsDiv.appendChild(btn);
-  });
-
-  modal.style.display = "flex";
+function getNextQuestion(){
+  if(questionPool.length===0) questionPool=shuffle([...QUESTION_BANK]);
+  return questionPool.pop();
 }
 
-function checkAnswer(selected, correct) {
-  modal.style.display = "none";
-  if (selected === correct) {
-    dropPiece(selectedColumn);
-  } else {
-    alert("Incorrect! Turn passes.");
-    switchPlayer();
+function askQuestion(){
+  if(pendingColumn===null) return;
+  const currentQuestion=getNextQuestion();
+  $('#qtext').textContent=`Column ${pendingColumn+1}: ${currentQuestion.prompt}`;
+  const answers=$('#answers'); answers.innerHTML='';
+  const opts=shuffle(currentQuestion.options);
+
+  for(const opt of opts){
+    const btn=document.createElement('button');
+    btn.className='answer';
+    btn.textContent=opt;
+    btn.onclick=()=>{
+      const ok = (opt===currentQuestion.correct);
+      if(!ok){ btn.classList.add('wrong'); }
+      finishQuestion(ok);
+    };
+    answers.appendChild(btn);
   }
 }
 
-function dropPiece(col) {
-  for (let r = rows - 1; r >= 0; r--) {
-    if (board[r][col] === 0) {
-      board[r][col] = currentPlayer;
-      updateBoard();
-      if (checkWin(r, col)) {
-        setTimeout(() => {
-          alert(`Player ${currentPlayer} wins!`);
-          resetGame();
-        }, 100);
-        return;
-      }
-      switchPlayer();
+function finishQuestion(correct){
+  if(correct){
+    toast('✅ Correct!');
+    dropDisc(pendingColumn);
+    if(checkWinner(current)){
+      toast((current===1?'Red':'Yellow')+' wins! 🎉',5000);
+      $('#turn').textContent = (current===1?'Red':'Yellow')+' WINS!';
+      disableColumns();
       return;
     }
+  } else {
+    toast('❌ Incorrect — turn passes');
   }
+  pendingColumn=null;
+  $('#answers').innerHTML='';
+  $('#qtext').textContent='Pick a column to get a question…';
+  current = 3 - current;
+  updateTurn();
+  renderBoard();
 }
 
-function updateBoard() {
-  const cells = document.querySelectorAll(".cell");
-  cells.forEach(cell => {
-    const r = cell.dataset.row;
-    const c = cell.dataset.col;
-    cell.classList.remove("player1","player2");
-    if (board[r][c] === 1) cell.classList.add("player1");
-    if (board[r][c] === 2) cell.classList.add("player2");
-  });
+function dropDisc(col){
+  let row = ROWS-1;
+  while(row>=0 && grid[row][col]!==0) row--;
+  if(row<0){ pendingColumn=null; return; }
+  grid[row][col]=current;
+  renderBoard();
+  const idx = row*COLS + col;
+  const disc = $$('#board .disc')[idx];
+  requestAnimationFrame(()=>disc.classList.add('show'));
 }
 
-function switchPlayer() {
-  currentPlayer = currentPlayer === 1 ? 2 : 1;
-  statusDiv.textContent = `Player ${currentPlayer}'s turn`;
-}
-
-function checkWin(r, c) {
-  const directions = [
-    [[0,1],[0,-1]],
-    [[1,0],[-1,0]],
-    [[1,1],[-1,-1]],
-    [[1,-1],[-1,1]]
-  ];
-
-  for (let dir of directions) {
-    let count = 1;
-    for (let [dr,dc] of dir) {
-      let rr = r + dr;
-      let cc = c + dc;
-      while (
-        rr >= 0 && rr < rows &&
-        cc >= 0 && cc < cols &&
-        board[rr][cc] === currentPlayer
-      ) {
-        count++;
-        rr += dr;
-        cc += dc;
-      }
+function checkWinner(player){
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      if(grid[r][c]!==player) continue;
+      if(c+3<COLS && grid[r][c+1]===player && grid[r][c+2]===player && grid[r][c+3]===player) return true;
+      if(r+3<ROWS && grid[r+1][c]===player && grid[r+2][c]===player && grid[r+3][c]===player) return true;
+      if(r+3<ROWS && c+3<COLS && grid[r+1][c+1]===player && grid[r+2][c+2]===player && grid[r+3][c+3]===player) return true;
+      if(r+3<ROWS && c-3>=0 && grid[r+1][c-1]===player && grid[r+2][c-2]===player && grid[r+3][c-3]===player) return true;
     }
-    if (count >= 4) return true;
   }
   return false;
 }
 
-function resetGame() {
-  currentPlayer = 1;
-  statusDiv.textContent = "Player 1's turn";
-  createBoard();
-}
+function disableColumns(){ $$('#colSelect .col-btn').forEach(btn=>btn.disabled=true); }
 
-createBoard();
-  // Service Worker registration
+$('#newGame').onclick=resetBoard;
+
+resetBoard();
+
+// Service Worker
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./service-worker.js')
-      .then(reg => console.log('✅ Service Worker registered', reg))
-      .catch(err => console.error('❌ Service Worker registration failed', err));
+    navigator.serviceWorker.register('./service-worker.js');
   });
 }
 </script>
-
-</body>
 </html>
